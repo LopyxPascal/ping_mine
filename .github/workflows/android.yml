@@ -1,42 +1,49 @@
-name: Build APK (Buildozer)
+[app]
+title = Craft Pong Diamond
+package.name = craftpong
+package.domain = org.mugen
 
-on:
-  workflow_dispatch:
+version = 1.0
 
-jobs:
-  build:
-    runs-on: ubuntu-22.04
+source.dir = .
+source.main = main.py
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+# Включаем ассеты гарантированно
+source.include_exts = py,png,jpg,jpeg,wav,ogg,mp3,ttf,txt,json
+source.include_patterns = assets/*
 
-      - name: System deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3 python3-pip python3-venv \
-            git zip unzip \
-            openjdk-17-jdk \
-            build-essential \
-            libffi-dev libssl-dev \
-            zlib1g-dev \
-            libsqlite3-dev \
-            autoconf automake libtool pkg-config \
-            cmake \
-            cython3
+source.exclude_exts = pyc,pyo,pyd,so,dylib
+source.exclude_dirs = __pycache__,.git,.idea,.vscode,build,dist,bin,.venv,venv
 
-      - name: Python deps
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --upgrade buildozer Cython
+# Pygame-ce оставляем как у тебя (на Android часто стабильнее)
+requirements = python3,pygame-ce
 
-      - name: Build APK
-        run: |
-          buildozer -v android debug
+# SDL2 bootstrap
+p4a.bootstrap = sdl2
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk
-          path: bin/*.apk
+# Экран
+orientation = landscape
+fullscreen = 1
+
+# Разрешения (если онлайн реально не нужен — можешь потом убрать INTERNET)
+android.permissions = INTERNET,WAKE_LOCK
+
+# Версии Android
+android.api = 34
+android.minapi = 21
+
+# СТАБИЛИЗАТОРЫ (важно)
+android.accept_sdk_license = True
+android.ndk = 25b
+android.archs = arm64-v8a,armeabi-v7a
+
+# Хранилище/AndroidX
+android.private_storage = True
+android.use_androidx = True
+
+log_level = 2
+
+[buildozer]
+log_level = 2
+build_dir = .buildozer
+warn_on_root = 1
