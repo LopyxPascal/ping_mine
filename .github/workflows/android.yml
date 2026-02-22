@@ -9,11 +9,15 @@ jobs:
   build:
     runs-on: ubuntu-22.04
 
+    env:
+      ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -32,11 +36,13 @@ jobs:
 
       - name: Install system dependencies
         run: |
+          set -eux
           sudo apt update
           sudo apt install -y \
             python3 python3-pip python3-setuptools python3-wheel \
             git zip unzip curl \
             build-essential \
+            openjdk-17-jdk \
             libffi-dev libssl-dev \
             zlib1g-dev \
             libjpeg-dev libpng-dev \
@@ -46,42 +52,47 @@ jobs:
 
       - name: Install Python build tools
         run: |
+          set -eux
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install cython==0.29.36
           python3 -m pip install buildozer
 
-      - name: Setup Android SDK (accept licenses + install build-tools)
-        env:
-          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+      - name: Setup Android SDK (cmdline-tools + licenses + build-tools)
         run: |
           set -eux
-
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
 
           mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
           cd /tmp
 
+          # Android cmdline-tools
           curl -L -o cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip -q cmdline.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
           mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
 
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 
+          # Accept licenses non-interactively
           yes | sdkmanager --licenses
 
+          # Install stable tools (avoid RC build-tools)
           sdkmanager --install \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0"
 
+          # IMPORTANT: Buildozer/p4a may look for sdkmanager in legacy location:
+          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
+          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+
+          # Sanity check
+          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
           ls -la "$ANDROID_SDK_ROOT/build-tools/34.0.0" | head -n 50
 
       - name: Build APK
-        env:
-          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-          ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         run: |
+          set -eux
           buildozer -v android debug
 
       - name: Upload APK artifact
