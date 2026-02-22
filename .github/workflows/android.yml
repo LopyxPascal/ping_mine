@@ -1,102 +1,42 @@
-name: Android APK (Buildozer)
+name: Build APK (Buildozer)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
-    env:
-      ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 17 (Temurin)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Cache buildozer & gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            .buildozer
-            ~/.buildozer
-            ~/.gradle
-          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            ${{ runner.os }}-buildozer-
-
-      - name: Install system dependencies
+      - name: System deps
         run: |
-          set -eux
-          sudo apt update
-          sudo apt install -y \
-            python3 python3-pip python3-setuptools python3-wheel \
-            git zip unzip curl \
-            build-essential \
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 python3-pip python3-venv \
+            git zip unzip \
             openjdk-17-jdk \
+            build-essential \
             libffi-dev libssl-dev \
             zlib1g-dev \
-            libjpeg-dev libpng-dev \
-            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-            libgl1-mesa-dev \
-            autoconf automake libtool pkg-config cmake
+            libsqlite3-dev \
+            autoconf automake libtool pkg-config \
+            cmake \
+            cython3
 
-      - name: Install Python build tools
+      - name: Python deps
         run: |
-          set -eux
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install cython==0.29.36
-          python3 -m pip install buildozer
-
-      - name: Setup Android SDK (cmdline-tools + licenses + build-tools)
-        run: |
-          set -eux
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          cd /tmp
-
-          # Android cmdline-tools
-          curl -L -o cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q cmdline.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-
-          # Accept licenses non-interactively
-          yes | sdkmanager --licenses
-
-          # Install stable tools (avoid RC build-tools)
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
-
-          # IMPORTANT: Buildozer/p4a may look for sdkmanager in legacy location:
-          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
-          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
-
-          # Sanity check
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
-          ls -la "$ANDROID_SDK_ROOT/build-tools/34.0.0" | head -n 50
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade buildozer Cython
 
       - name: Build APK
         run: |
-          set -eux
           buildozer -v android debug
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CraftPong-APK
+          name: apk
           path: bin/*.apk
