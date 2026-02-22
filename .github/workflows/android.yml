@@ -10,13 +10,26 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install system deps
+      # Кэш ускоряет повторные сборки
+      - name: Cache buildozer & gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            .buildozer
+            ~/.buildozer
+            ~/.gradle
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
+
+      - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y \
-            python3 python3-pip \
+            python3 python3-pip python3-setuptools python3-wheel \
             git zip unzip \
             openjdk-17-jdk \
             build-essential \
@@ -24,18 +37,21 @@ jobs:
             zlib1g-dev \
             libjpeg-dev libpng-dev \
             libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-            libgl1-mesa-dev
+            libgl1-mesa-dev \
+            autoconf automake libtool pkg-config \
+            cmake
 
-      - name: Install buildozer
+      - name: Install Python build tools
         run: |
-          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install cython==0.29.36
           python3 -m pip install buildozer
 
       - name: Build APK
         run: |
           buildozer -v android debug
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: CraftPong-APK
